@@ -139,9 +139,30 @@ distclean: clean
 		rm -f ext/phar/phar/phar.inc; \
 	fi
 
+PGO_DATA_DIR = $(top_builddir)/pgo-data
+LLVM_PROFDATA = llvm-profdata
+PROF_GEN_FLAGS = $(PHP_PGO_GENERATE_FLAGS)
+PROF_USE_FLAGS = $(PHP_PGO_USE_FLAGS)
+
 prof-gen:
-	CCACHE_DISABLE=1 $(MAKE) PROF_FLAGS=-fprofile-generate all
-	find . -name \*.gcda | xargs rm -f
+	@test "$(PHP_PGO_COMPILER)" != unsupported || { echo "PGO requires GCC or Clang."; exit 1; }
+	$(MAKE) prof-clean
+	$(MAKE) prof-reset
+	CCACHE_DISABLE=1 $(MAKE) PROF_FLAGS='$(PROF_GEN_FLAGS)' all
+	$(MAKE) prof-reset
+
+prof-reset:
+	find . -name \*.gcda -type f -exec rm -f {} +
+	mkdir -p "$(PGO_DATA_DIR)"
+	find "$(PGO_DATA_DIR)" -name \*.profraw -type f -exec rm -f {} +
+	rm -f "$(PGO_DATA_DIR)/php.profdata" "$(PGO_DATA_DIR)/profiles.list"
+
+prof-merge:
+	@test "$(PHP_PGO_COMPILER)" = clang || { echo "prof-merge requires a Clang build."; exit 1; }
+	mkdir -p "$(PGO_DATA_DIR)"
+	find "$(PGO_DATA_DIR)" -name \*.profraw -type f -print > "$(PGO_DATA_DIR)/profiles.list"
+	@test -s "$(PGO_DATA_DIR)/profiles.list" || { echo "No Clang profiles found; train the instrumented build first."; exit 1; }
+	"$(LLVM_PROFDATA)" merge --input-files="$(PGO_DATA_DIR)/profiles.list" --output="$(PGO_DATA_DIR)/php.profdata"
 
 prof-clean:
 	find . -name \*.lo -o -name \*.o | xargs rm -f
@@ -150,7 +171,14 @@ prof-clean:
 	rm -f libphp.la $(SAPI_CLI_PATH) $(SAPI_CGI_PATH) $(SAPI_LITESPEED_PATH) $(SAPI_FPM_PATH) $(SAPI_PHPDBG_PATH) $(SAPI_PHPDBG_SHARED_PATH) $(OVERALL_TARGET) modules/* libs/*
 
 prof-use:
-	CCACHE_DISABLE=1 $(MAKE) PROF_FLAGS=-fprofile-use all
+	@test "$(PHP_PGO_COMPILER)" != unsupported || { echo "PGO requires GCC or Clang."; exit 1; }
+	@if test "$(PHP_PGO_COMPILER)" = clang; then \
+		$(MAKE) prof-merge; \
+	else \
+		test -n "`find . -name \*.gcda -type f -print -quit`" || { echo "No GCC profiles found; train the instrumented build first."; exit 1; }; \
+	fi
+	$(MAKE) prof-clean
+	CCACHE_DISABLE=1 $(MAKE) PROF_FLAGS='$(PROF_USE_FLAGS)' all
 
 %_arginfo.h: %.stub.php
 	@if test -e "$(top_srcdir)/build/gen_stub.php"; then \
@@ -163,4 +191,4 @@ prof-use:
 		fi; \
 	fi;
 
-.PHONY: all clean install distclean test prof-gen prof-clean prof-use
+.PHONY: all clean install distclean test prof-gen prof-reset prof-merge prof-clean prof-use

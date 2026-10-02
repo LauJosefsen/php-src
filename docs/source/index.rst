@@ -22,6 +22,7 @@
    miscellaneous/stubs
    miscellaneous/writing-tests
    miscellaneous/running-tests
+   miscellaneous/pgo
 
 Welcome to the php-src documentation!
 
