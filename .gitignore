@@ -266,6 +266,7 @@ tmp-php.ini
 # ------------------------------------------------------------------------------
 *.gcda
 *.gcno
+/pgo-data/
 /gcovr.xml
 /gcovr_html/
 /lcov_html/
@@ -311,6 +312,7 @@ tmp-php.ini
 # Special cases to invert previous ignore patterns
 # ------------------------------------------------------------------------------
 !/ext/bcmath/libbcmath/src/config.h
+!/build/tests/*.sh
 !/ext/fileinfo/libmagic/config.h
 !/ext/fileinfo/libmagic.patch
 !/ext/fileinfo/magicdata.patch

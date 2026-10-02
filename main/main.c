@@ -91,6 +91,14 @@
 #include "main_arginfo.h"
 /* }}} */
 
+#ifdef PHP_PGO_GENERATE
+# ifdef __clang__
+extern int __llvm_profile_dump(void);
+# else
+extern void __gcov_dump(void);
+# endif
+#endif
+
 PHPAPI int (*php_register_internal_extensions_func)(void) = php_register_internal_extensions;
 
 #ifndef ZTS
@@ -2488,6 +2496,9 @@ int php_module_shutdown_wrapper(sapi_module_struct *sapi_globals)
 /* }}} */
 
 /* {{{ php_module_shutdown */
+#if defined(PHP_PGO_GENERATE) || defined(PHP_PGO_USE)
+__attribute__((no_profile_instrument_function))
+#endif
 void php_module_shutdown(void)
 {
 	int module_number=0;
@@ -2563,6 +2574,14 @@ void php_module_shutdown(void)
 #endif
 
 	zend_observer_shutdown();
+
+#ifdef PHP_PGO_GENERATE
+# ifdef __clang__
+	__llvm_profile_dump();
+# else
+	__gcov_dump();
+# endif
+#endif
 }
 /* }}} */
 

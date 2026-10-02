@@ -122,6 +122,28 @@ AC_PROG_CPP
 AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_LN_S
 
+AC_CACHE_CHECK([whether the C compiler is Clang], [php_cv_pgo_clang],
+  [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#ifndef __clang__
+# error Not Clang
+#endif
+  ]], [])], [php_cv_pgo_clang=yes], [php_cv_pgo_clang=no])])
+
+AS_VAR_IF([php_cv_pgo_clang], [yes], [
+  PHP_PGO_COMPILER=clang
+  PHP_PGO_GENERATE_FLAGS='-fprofile-generate=$(PGO_DATA_DIR) -fprofile-update=atomic -DPHP_PGO_GENERATE'
+  PHP_PGO_USE_FLAGS='-fprofile-use=$(PGO_DATA_DIR)/php.profdata -DPHP_PGO_USE'
+], [
+  AS_VAR_IF([GCC], [yes], [
+    PHP_PGO_COMPILER=gcc
+    PHP_PGO_GENERATE_FLAGS='-fprofile-generate -fprofile-update=atomic -DPHP_PGO_GENERATE'
+    PHP_PGO_USE_FLAGS='-fprofile-use -fprofile-correction -DPHP_PGO_USE'
+  ], [PHP_PGO_COMPILER=unsupported])
+])
+PHP_SUBST([PHP_PGO_COMPILER])
+PHP_SUBST([PHP_PGO_GENERATE_FLAGS])
+PHP_SUBST([PHP_PGO_USE_FLAGS])
+
 AS_VAR_IF([cross_compiling], [yes],
   [AC_CHECK_PROGS([BUILD_CC], [gcc clang c99 c89 cc cl], [none])
     AC_MSG_CHECKING([for native build C compiler])
